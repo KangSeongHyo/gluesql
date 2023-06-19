@@ -1,5 +1,6 @@
 #[cfg(feature = "sled-storage")]
 mod hello_world {
+    use std::ops::Div;
     use {
         gluesql::{
             prelude::{Glue, Payload, Value},
@@ -7,6 +8,7 @@ mod hello_world {
         },
         std::fs,
     };
+    const PRICE : usize = 1;
 
     pub async fn run() {
         /*
@@ -15,7 +17,7 @@ mod hello_world {
         /*
             Open a Sled database, this will create one if one does not yet exist
         */
-        let sled_dir = "/tmp/gluesql/hello_world";
+        let sled_dir = "/tmp/gluesql/tour";
         fs::remove_dir_all(sled_dir).unwrap_or(());
         let storage = SledStorage::new(sled_dir).expect("Something went wrong!");
         /*
@@ -29,8 +31,9 @@ mod hello_world {
             Write queries as a string
         */
         let queries = "
-            CREATE TABLE greet (name TEXT);
-            INSERT INTO greet VALUES ('World');
+            CREATE TABLE accommodation (id INTEGER, name TEXT, price INTEGER);
+            INSERT INTO accommodation VALUES (1, 'St Johns Hotel', 60000);
+            INSERT INTO accommodation VALUES (2, 'Pd Hotel', 50000);
         ";
 
         glue.execute(queries).await.expect("Execution failed");
@@ -39,7 +42,7 @@ mod hello_world {
             Select inserted row
         */
         let queries = "
-            SELECT name FROM greet
+            SELECT name, price FROM accommodation
         ";
 
         let result = glue.execute(queries).await.expect("Failed to execute");
@@ -47,24 +50,24 @@ mod hello_world {
         /*
             Query results are wrapped into a payload enum, on the basis of the query type
         */
+        println!("{:?}",result);
         assert_eq!(result.len(), 1);
+
         let rows = match &result[0] {
             Payload::Select { labels: _, rows } => rows,
             _ => panic!("Unexpected result: {:?}", result),
         };
 
-        let first_row = &rows[0];
-        let first_value = first_row.iter().next().unwrap();
+        assert_eq!(rows.len(), 2);
 
-        /*
-            Row values are wrapped into a value enum, on the basis of the result type
-        */
-        let to_greet = match first_value {
-            Value::Str(to_greet) => to_greet,
-            value => panic!("Unexpected type: {:?}", value),
-        };
+        let mut total_price = 0;
+        for accommodation in rows.iter() {
+            let price = match accommodation[PRICE] { Value::I64(price) => price , _=> 0};
+            total_price += price
+        }
 
-        println!("Hello {}!", to_greet); // Will always output "Hello World!"
+        assert_eq!(total_price, 110000);
+        println!("숙박 평균가 = {}",total_price.div(rows.len() as i64))
     }
 }
 
